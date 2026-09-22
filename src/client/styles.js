@@ -94,18 +94,14 @@ const CSS = `
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 14px 28px rgba(11, 28, 58, 0.16));
+  /* No drop-shadow. The artwork is keyed to a clean alpha edge, and a CSS shadow
+     around a cut-out reads as a failed cut-out rather than as depth — the dot
+     field behind it already supplies the depth. */
+  filter: none;
   /* The artwork is a torso crop, so its last rows dissolve instead of showing a
      hard cut where the scene stops above the composer. */
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-character-fade, 20px)), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-character-fade, 20px)), transparent 100%);
-}
-
-/* Dark surfaces need a shadow that reads as depth, not as dirt. */
-@media (prefers-color-scheme: dark) {
-  [data-doubao-character] {
-    filter: drop-shadow(0 14px 32px rgba(0, 0, 0, 0.55));
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
