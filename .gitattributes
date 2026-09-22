@@ -1,0 +1,10 @@
+# Repository-normalised line endings.
+* text=auto eol=lf
+
+# Binary artwork.
+*.png binary
+
+# The client bundle is a generated artifact with artwork embedded as base64 and
+# GLSL kept in template literals. It must check out byte-for-byte identical to what
+# `node tools/build-client.mjs` produced, so no EOL conversion, ever.
+client/client.js -text -diff
