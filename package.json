@@ -1,0 +1,52 @@
+{
+  "name": "dsh-theme-doubao",
+  "version": "1.0.0",
+  "private": true,
+  "description": "豆包主题（Doubao theme）for the DeepSeek Harness Web client: Doubao brand in the sidebar, a Doubao hero character above the composer, and a WebGL port of the deepseek.com/harness dot-matrix DeepSeek whale particle field.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "assets"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "node tools/build-client.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zdz6215591/dsh-theme-doubao.git"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "theme",
+    "doubao",
+    "豆包"
+  ]
+}

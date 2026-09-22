@@ -1,0 +1,10 @@
+# Build scratch: raw pixel dumps, intermediate previews and screenshots taken while
+# iterating on the artwork.
+_work/
+
+# Local editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.log
