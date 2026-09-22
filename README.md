@@ -108,8 +108,16 @@ docs/                     预览截图
 
 ## 安装
 
+从 GitHub 装（`client/client.js` 已提交，装完即可用，不需要构建）：
+
 ```powershell
-dsh plugin --profile web add C:\Users\DongZhi\Desktop\vibcode\dsh_theme_doubao
+dsh plugin --profile web add github:zdz6215591/dsh-theme-doubao
+```
+
+或者从本地目录装（开发时用，改完 `node tools/build-client.mjs` 即生效）：
+
+```powershell
+dsh plugin --profile web add <本仓库路径>
 ```
 
 然后**重启 DSH**（客户端 bundle 在启动时快照，热更只对源码启动 + `pnpm run dev:web` 生效），
