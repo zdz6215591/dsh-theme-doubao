@@ -51,9 +51,26 @@ const CSS = `
   pointer-events: none;
 }
 
+/* Clip box sized to exactly the band the scene may draw in. It paints nothing, so
+   it is also the safest place for the field's bottom fade: the fade is measured in
+   band units, and anything the oversized canvas puts past the box is dropped
+   instead of growing a scrollbar. */
+[data-doubao-field] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-field-fade, 104px)), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-field-fade, 104px)), transparent 100%);
+}
+
 /* Centring uses auto margins rather than translateX(-50%): a transform would park
    the artwork on half-pixel boundaries and soften every edge on 1x screens. */
-[data-doubao-field] {
+[data-doubao-canvas] {
   position: absolute;
   left: 0;
   right: 0;
@@ -71,7 +88,7 @@ const CSS = `
   margin-left: auto;
   margin-right: auto;
   display: block;
-  width: var(--doubao-character-w, 260px);
+  width: var(--doubao-character-w, 300px);
   height: auto;
   max-width: none;
   pointer-events: none;

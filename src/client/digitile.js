@@ -185,11 +185,13 @@ in float vAssembly;
 in float vLight;
 uniform float uTime;
 uniform vec3 uColor;
+/** Centre bloom weight; 0 flattens the field to one tone. */
+uniform float uGlow;
 out vec4 outColor;
 
 void main() {
   float dist = length(vWorldPos.xy);
-  float glow = smoothstep(8.0, 0.0, dist) * 0.3 * vAssembly;
+  float glow = smoothstep(8.0, 0.0, dist) * uGlow * vAssembly;
 
   float baseAlpha = mix(0.45, 0.75, vAssembly);
   float alpha = vOpacity * (baseAlpha + glow);
@@ -447,6 +449,7 @@ function createDigitileField(canvas, options) {
     color: options.color || [0.75, 0.8, 0.9],
     shadeMin: options.shadeMin === void 0 ? LIGHT.shadeMin : options.shadeMin,
     shadeMax: options.shadeMax === void 0 ? LIGHT.shadeMax : options.shadeMax,
+    glow: options.glow === void 0 ? 0.3 : options.glow,
     followPointer: options.followPointer !== false,
   }
   const gl = canvas.getContext('webgl2', {
@@ -506,6 +509,7 @@ function createDigitileField(canvas, options) {
   const uLightRange = uniform('uLightRange')
   const uShadeMin = uniform('uShadeMin')
   const uShadeMax = uniform('uShadeMax')
+  const uGlow = uniform('uGlow')
   const uColor = uniform('uColor')
 
   const geometry = tileGeometry()
@@ -676,6 +680,7 @@ function createDigitileField(canvas, options) {
     gl.uniform1f(uLightRange, LIGHT.range)
     gl.uniform1f(uShadeMin, appearance.shadeMin)
     gl.uniform1f(uShadeMax, appearance.shadeMax)
+    gl.uniform1f(uGlow, appearance.glow)
     gl.uniform3f(
       uColor,
       appearance.color[0] * intensity,
@@ -734,6 +739,7 @@ function createDigitileField(canvas, options) {
       if (next.color !== undefined) appearance.color = next.color
       if (next.shadeMin !== undefined) appearance.shadeMin = next.shadeMin
       if (next.shadeMax !== undefined) appearance.shadeMax = next.shadeMax
+      if (next.glow !== undefined) appearance.glow = next.glow
     },
     /** Report the pointer state so an idle field can be restarted after a resize. */
     refresh() {
@@ -756,6 +762,8 @@ function createDigitileField(canvas, options) {
 }
 
 module.exports = { createDigitileField }
+
+
 
 
 

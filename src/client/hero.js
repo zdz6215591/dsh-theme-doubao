@@ -13,7 +13,7 @@ const { createDigitileField } = require('./digitile.js')
 const { CHARACTER, WHALE } = require('./artwork.js')
 
 /** Intrinsic pixel size of `assets/doubao-character.png`. */
-const CHARACTER_SOURCE = { width: 804, height: 625 }
+const CHARACTER_SOURCE = { width: 727, height: 623 }
 /** Intrinsic aspect of the character artwork. */
 const CHARACTER_ASPECT = CHARACTER_SOURCE.width / CHARACTER_SOURCE.height
 /** Vertical world units the digitile camera shows, `2*tan(fov/2)*z` for fov 50 @ z 18. */
@@ -26,18 +26,20 @@ const CONFIG = {
   /** Gap kept below the character's flat lower edge, above the composer card. */
   cardGap: 2,
   /** Gap between the field's bounding box and the available band. */
-  fieldGap: 18,
-  /** Space kept between the band's ceiling and the field's top. */
+  fieldGap: 14,
+  /** Space kept between the band's ceiling and the top of the scene. */
   ceilingGap: 8,
   /** Character height as a fraction of the available band. */
-  characterBandRatio: 0.4,
-  /** Hard caps so large windows do not turn the scene into a poster. */
-  characterMaxWidth: 280,
-  characterMaxHeight: 236,
+  characterBandRatio: 0.46,
+  /** Hard caps, reached on tall or very large windows. */
+  characterMaxWidth: 400,
+  characterMaxHeight: 340,
   /** Bottom fade length as a fraction of the rendered artwork height. */
-  characterFadeRatio: 0.09,
-  /** The field may be at most this many times the character's width. */
-  fieldMaxCharacterRatio: 2.2,
+  characterFadeRatio: 0.085,
+  /** Whale width as a multiple of the character's width. */
+  whaleWidthRatio: 1.7,
+  /** Length of the field's bottom fade, measured up from the controls row. */
+  fieldFade: 104,
   /** Bottom breathing room added to the composer stack while the hero is mounted. */
   composerBottomPad: 'clamp(16px, 9vh, 96px)',
 }
@@ -156,17 +158,23 @@ function readSurfaceIsDark(probe) {
 }
 
 /**
- * Appearance per surface. The upstream hero glows additively on black; that is
- * invisible on a light surface, so a light surface keeps the same shader with
- * alpha blending, a DeepSeek-blue ink, and a narrower light range — the upstream
- * range bottoms out at near-black, which reads as dirt on white.
+ * Appearance per surface, one flat colour for every particle.
+ *
+ * The upstream material multiplies a single light into the colour, adds a centre
+ * bloom, and uses additive blending as a glow on black. On a white surface that
+ * mixture reads as a blue-and-grey speckle, and used additively there it would be
+ * invisible. So `shadeMin === shadeMax` flattens the per-particle shading and
+ * `glow: 0` drops the centre tint, leaving one tone per surface: a light periwinkle
+ * on light, white on dark. Restoring the upstream treatment is a one-line change —
+ * give the two bounds the upstream 0.28 / 2.79 (dark) or 0.55 / 1.35 (light) and
+ * `glow: 0.3`.
  * @param isDark - whether the resolved surface is dark.
- * @returns colour, blending and shading range for the field.
+ * @returns colour, blending, shading range and bloom weight for the field.
  */
 function appearanceFor(isDark) {
   return isDark
-    ? { additive: true, color: [0.75, 0.8, 0.9], shadeMin: 0.28, shadeMax: 2.79 }
-    : { additive: false, color: [0.24, 0.4, 0.95], shadeMin: 0.55, shadeMax: 1.35 }
+    ? { additive: true, color: [0.78, 0.83, 0.92], shadeMin: 1, shadeMax: 1, glow: 0 }
+    : { additive: false, color: [0.55, 0.64, 0.9], shadeMin: 1, shadeMax: 1, glow: 0 }
 }
 
 /* ------------------------------------------------------------------ *
@@ -181,6 +189,7 @@ function DoubaoHeroMark() {
   const hostRef = React.useRef(null)
   const stageRef = React.useRef(null)
   const fieldRef = React.useRef(null)
+  const canvasRef = React.useRef(null)
   const imageRef = React.useRef(null)
   const probeRef = React.useRef(null)
   const handleRef = React.useRef(null)
@@ -191,8 +200,9 @@ function DoubaoHeroMark() {
     const host = hostRef.current
     const stage = stageRef.current
     const field = fieldRef.current
+    const canvas = canvasRef.current
     const image = imageRef.current
-    if (host === null || stage === null || field === null || image === null) return undefined
+    if (host === null || stage === null || field === null || canvas === null || image === null) return undefined
 
     const restoreHeadline = hideHeadline(host)
     const scroll = host.closest('[data-conversation-scroll]')
@@ -238,7 +248,9 @@ function DoubaoHeroMark() {
         availH * CONFIG.characterBandRatio * CHARACTER_ASPECT,
         CONFIG.characterMaxWidth,
         CHARACTER_SOURCE.width / dpr,
-        availW,
+        // The field is wider than the character, and the character's width drives
+        // the field's width — so the field's fit constrains the character.
+        (availW - CONFIG.fieldGap) / CONFIG.whaleWidthRatio,
       )
       width = Math.max(72, Math.floor(width))
       const height = Math.round(width / CHARACTER_ASPECT)
@@ -247,29 +259,27 @@ function DoubaoHeroMark() {
       image.style.setProperty('--doubao-character-fade', `${Math.round(height * CONFIG.characterFadeRatio)}px`)
 
       // ── dot-matrix field ───────────────────────────────────────────
-      const bandCenter = bandTop + availH / 2
-      const maxFieldWidth = Math.min(availW, width * CONFIG.fieldMaxCharacterRatio)
-      const maxFieldHeight = Math.min(availH, scrollRect.height) - CONFIG.fieldGap
-      // The canvas is centred on the band, so half of it hangs below the band's
-      // centre; letting that reach past the scroll host would grow a scrollbar,
-      // which caps how large the field can be before it is repositioned.
-      const canvasFit = Math.max(60, (scrollRect.bottom - bandCenter) / (FIELD_VIEW_HEIGHT / 2))
-      const unit = Math.max(
-        3,
-        Math.min(
-          (maxFieldHeight - CONFIG.fieldGap) / WHALE_UNITS.height,
-          (maxFieldWidth - CONFIG.fieldGap) / WHALE_UNITS.width,
-          canvasFit,
-        ),
-      )
-      const canvasH = Math.max(90, FIELD_VIEW_HEIGHT * unit)
-      const canvasW = Math.max(90, Math.min(canvasH, maxFieldWidth))
-      const desiredBottom = bandBottom - bandCenter - canvasH / 2
-      // `bottom` is measured up from the stage, whose bottom edge is the card top.
-      const floor = bandBottom - scrollRect.bottom + CONFIG.fieldGap
-      field.style.width = `${Math.round(canvasW)}px`
-      field.style.height = `${Math.round(canvasH)}px`
-      field.style.bottom = `${Math.round(Math.max(desiredBottom, floor))}px`
+      // Both are anchored to the controls row rather than to the middle of the
+      // band, which is what keeps the head and the dots from drifting apart on a
+      // tall window: the gap between them can only ever be the scene's own
+      // geometry, never the leftover height.
+      const unit = (width * CONFIG.whaleWidthRatio) / WHALE_UNITS.width
+      const whaleHeight = WHALE_UNITS.height * unit
+      const canvasHeight = FIELD_VIEW_HEIGHT * unit
+      const canvasWidth = Math.round(canvasHeight)
+      // The whale is centred inside its canvas, so putting the whale's bottom on
+      // the controls row pushes the canvas' bottom below the clip box on purpose:
+      // the fade in `styles.js` dissolves that overhang, and the clip box keeps it
+      // from growing a scrollbar.
+      const canvasBottom = -(canvasHeight - whaleHeight) / 2
+      canvas.style.width = `${canvasWidth}px`
+      canvas.style.height = `${Math.round(canvasHeight)}px`
+      canvas.style.bottom = `${Math.round(canvasBottom)}px`
+      // The clip box is exactly the band, so nothing the field draws can create
+      // scrollable overflow, vertically or horizontally.
+      field.style.top = `${Math.round(bandTop - hostRect.top)}px`
+      field.style.height = `${Math.round(availH)}px`
+      field.style.setProperty('--doubao-field-fade', `${Math.round(CONFIG.fieldFade)}px`)
       // The stage grows downwards from the (zero-height) hero row to the card top.
       stage.style.height = `${Math.round(Math.max(0, bandBottom - hostRect.top))}px`
 
@@ -317,7 +327,7 @@ function DoubaoHeroMark() {
 
   // Field lifetime is its own effect so the WebGL context survives re-layouts.
   React.useLayoutEffect(() => {
-    const canvas = fieldRef.current
+    const canvas = canvasRef.current
     if (canvas === null) return undefined
     const isDark = readSurfaceIsDark(probeRef.current)
     darkRef.current = isDark
@@ -357,7 +367,13 @@ function DoubaoHeroMark() {
           background: 'var(--dsw-alias-bg-base)',
         },
       }),
-      React.createElement('canvas', { 'data-doubao-field': '', ref: fieldRef }),
+      // Clip box: exactly the band, so the oversized canvas inside cannot create
+      // scrollable overflow, and its bottom fade is measured in band units.
+      React.createElement(
+        'div',
+        { 'data-doubao-field': '', ref: fieldRef },
+        React.createElement('canvas', { 'data-doubao-canvas': '', ref: canvasRef }),
+      ),
       React.createElement('img', {
         'data-doubao-character': '',
         ref: imageRef,

@@ -153,8 +153,19 @@ const model = (x, y) => {
 }
 
 // --- key out the background ---
+// The poster's character drops a soft cast shadow on the backdrop. A shadow is the
+// backdrop multiplied by a factor below 1, not a different colour, so a plain
+// distance key keeps it alive as a grey halo. Fit that factor per pixel and drop
+// anything that is "a somewhat darker copy of this backdrop": the factor floor
+// keeps genuinely dark artwork out (a black shirt is 0.06x the backdrop, not 0.6x)
+// and the residual ceiling keeps anything with its own hue out.
+const shadowFactorMin = num('shadowmin', 0.5)
+const shadowFactorMax = num('shadowmax', 0.97)
+const shadowResidual = num('shadowtol', 15)
+
 const out = Buffer.alloc(cw * ch * 4)
 let minX = cw, minY = ch, maxX = -1, maxY = -1
+let shadowPixels = 0
 for (let y = y0; y < y1; y++) {
   for (let x = x0; x < x1; x++) {
     const [br, bg, bb] = model(x, y)
@@ -167,6 +178,19 @@ for (let y = y0; y < y1; y++) {
     a = a < 0 ? 0 : a > 1 ? 1 : a
     if (a < 0.12) a = 0
     if (pb - Math.max(pr, pg) > blueKill) a = 0
+    const backLen = br * br + bg * bg + bb * bb
+    const factor = backLen > 0 ? (pr * br + pg * bg + pb * bb) / backLen : 1
+    if (factor > shadowFactorMin && factor < shadowFactorMax) {
+      const residual = Math.max(
+        Math.abs(pr - factor * br),
+        Math.abs(pg - factor * bg),
+        Math.abs(pb - factor * bb),
+      )
+      if (residual < shadowResidual) {
+        if (a > 0) shadowPixels += 1
+        a = 0
+      }
+    }
     let r = pr, g = pg, b = pb
     if (a > 0.12 && a < 0.999) {
       r = Math.min(255, Math.max(0, (pr - (1 - a) * br) / a))
@@ -185,6 +209,7 @@ for (let y = y0; y < y1; y++) {
     }
   }
 }
+console.log(`cast-shadow keying: dropped ${shadowPixels} px`)
 console.log(`content box ${minX + x0},${minY + y0} - ${maxX + x0},${maxY + y0}`)
 
 const ox = Math.max(0, minX - padX), oy = Math.max(0, minY - padY)
