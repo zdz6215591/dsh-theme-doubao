@@ -2,6 +2,10 @@
 # iterating on the artwork.
 _work/
 
+# The full-resolution source art. Whatever is dropped in here is optimized into
+# assets/doubao-character.png before it ships, so the original stays out of the repo.
+透明背景人物.png
+
 # Local editor / OS noise
 .vscode/
 .idea/

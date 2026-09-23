@@ -13,7 +13,7 @@ const { createDigitileField } = require('./digitile.js')
 const { CHARACTER, WHALE } = require('./artwork.js')
 
 /** Intrinsic pixel size of `assets/doubao-character.png`. */
-const CHARACTER_SOURCE = { width: 727, height: 623 }
+const CHARACTER_SOURCE = { width: 900, height: 782 }
 /** Intrinsic aspect of the character artwork. */
 const CHARACTER_ASPECT = CHARACTER_SOURCE.width / CHARACTER_SOURCE.height
 /** Vertical world units the digitile camera shows, `2*tan(fov/2)*z` for fov 50 @ z 18. */
