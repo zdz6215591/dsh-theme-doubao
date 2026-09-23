@@ -90,6 +90,20 @@ if (evaluate !== null) {
   console.log(JSON.stringify(result.result?.value ?? result, null, 2))
 }
 
+// Dismiss first-run chrome (the API-key prompt) by clicking its own button.
+const click = arg('click', null)
+if (click !== null) {
+  const expression = `(() => {
+    const target = [...document.querySelectorAll('button')].find((button) => button.textContent.trim() === ${JSON.stringify(click)})
+    if (target === undefined) return 'not found'
+    target.click()
+    return 'clicked'
+  })()`
+  const result = await send('Runtime.evaluate', { expression, returnByValue: true })
+  console.log(`shoot: "${click}" -> ${result.result?.value}`)
+  await new Promise((resolve) => setTimeout(resolve, 800))
+}
+
 // Park the pointer so the field's scatter/light-follow can be observed.
 const move = arg('move', null)
 if (move !== null) {
