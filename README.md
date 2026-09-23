@@ -15,7 +15,6 @@
 | --- | --- |
 | ![深色](docs/hero-dark.png) | ![交互](docs/hero-pointer.png) |
 
-截图是在一个干净的 DSH 环境里拍的，工作区只有一个演示用的 `dsh-demo`。
 
 ## 安装
 
