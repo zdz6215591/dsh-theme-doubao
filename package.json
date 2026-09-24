@@ -5,6 +5,7 @@
   "description": "豆包主题（Doubao theme）for the DeepSeek Harness Web client: Doubao brand in the sidebar, a Doubao hero character above the composer, and a WebGL port of the deepseek.com/harness dot-matrix DeepSeek whale particle field.",
   "type": "module",
   "main": "lib/index.js",
+  "icon": "./assets/doubao-mark@2x.png",
   "exports": {
     ".": {
       "default": "./lib/index.js"
