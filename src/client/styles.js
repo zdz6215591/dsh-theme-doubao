@@ -68,25 +68,22 @@ const CSS = `
   mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-field-fade, 104px)), transparent 100%);
 }
 
-/* Centring uses auto margins rather than translateX(-50%): a transform would park
-   the artwork on half-pixel boundaries and soften every edge on 1x screens. */
+/* The canvas is wider than this box on purpose, and a box that overflows its
+   container is NOT centred by auto margins (they resolve to 0 and it sits flush
+   left — the field then drifts off-centre and gets clipped). So both layers are
+   centred by a computed, whole-pixel negative margin-left set from the layout
+   pass, which also keeps them off half-pixel boundaries. */
 [data-doubao-canvas] {
   position: absolute;
-  left: 0;
-  right: 0;
-  margin-left: auto;
-  margin-right: auto;
+  left: 50%;
   display: block;
   pointer-events: none;
 }
 
 [data-doubao-character] {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 50%;
   bottom: 0;
-  margin-left: auto;
-  margin-right: auto;
   display: block;
   width: var(--doubao-character-w, 300px);
   height: auto;

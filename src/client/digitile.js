@@ -187,6 +187,8 @@ uniform float uTime;
 uniform vec3 uColor;
 /** Centre bloom weight; 0 flattens the field to one tone. */
 uniform float uGlow;
+/** Overall particle opacity, so a theme can hold the field back. */
+uniform float uOpacity;
 out vec4 outColor;
 
 void main() {
@@ -194,7 +196,7 @@ void main() {
   float glow = smoothstep(8.0, 0.0, dist) * uGlow * vAssembly;
 
   float baseAlpha = mix(0.45, 0.75, vAssembly);
-  float alpha = vOpacity * (baseAlpha + glow);
+  float alpha = vOpacity * (baseAlpha + glow) * uOpacity;
   float shimmer = sin(uTime * 1.5 + vWorldPos.x * 5.0 + vWorldPos.y * 3.0) * 0.1 + 0.9;
   alpha *= shimmer * min(vLight, 1.0);
 
@@ -450,6 +452,7 @@ function createDigitileField(canvas, options) {
     shadeMin: options.shadeMin === void 0 ? LIGHT.shadeMin : options.shadeMin,
     shadeMax: options.shadeMax === void 0 ? LIGHT.shadeMax : options.shadeMax,
     glow: options.glow === void 0 ? 0.3 : options.glow,
+    opacity: options.opacity === void 0 ? 1 : options.opacity,
     followPointer: options.followPointer !== false,
   }
   const gl = canvas.getContext('webgl2', {
@@ -510,6 +513,7 @@ function createDigitileField(canvas, options) {
   const uShadeMin = uniform('uShadeMin')
   const uShadeMax = uniform('uShadeMax')
   const uGlow = uniform('uGlow')
+  const uOpacity = uniform('uOpacity')
   const uColor = uniform('uColor')
 
   const geometry = tileGeometry()
@@ -549,7 +553,6 @@ function createDigitileField(canvas, options) {
   let lastTime = 0
   let frame = 0
   let disposed = false
-  let currentGlow = 0
   let mouseStrength = 0
   let pointerHasMoved = false
   let pointerActive = false
@@ -630,7 +633,12 @@ function createDigitileField(canvas, options) {
     multiply(viewProj, proj, view)
 
     gl.enable(gl.BLEND)
-    if (appearance.additive) gl.blendFunc(gl.ONE, gl.ONE)
+    // Additive uses SRC_ALPHA/ONE rather than ONE/ONE: plain ONE/ONE ignores the
+    // fragment's alpha, so `uOpacity` would dim the alpha-blended light surface
+    // but leave the additive dark surface at full strength. Scaling the source by
+    // its alpha keeps the glow behaviour while making opacity mean something on
+    // both surfaces.
+    if (appearance.additive) gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
     else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.disable(gl.DEPTH_TEST)
     gl.depthMask(false)
@@ -681,6 +689,7 @@ function createDigitileField(canvas, options) {
     gl.uniform1f(uShadeMin, appearance.shadeMin)
     gl.uniform1f(uShadeMax, appearance.shadeMax)
     gl.uniform1f(uGlow, appearance.glow)
+    gl.uniform1f(uOpacity, appearance.opacity)
     gl.uniform3f(
       uColor,
       appearance.color[0] * intensity,
@@ -740,6 +749,7 @@ function createDigitileField(canvas, options) {
       if (next.shadeMin !== undefined) appearance.shadeMin = next.shadeMin
       if (next.shadeMax !== undefined) appearance.shadeMax = next.shadeMax
       if (next.glow !== undefined) appearance.glow = next.glow
+      if (next.opacity !== undefined) appearance.opacity = next.opacity
     },
     /** Report the pointer state so an idle field can be restarted after a resize. */
     refresh() {

@@ -42,7 +42,7 @@ dsh plugin --profile web remove dsh-theme-doubao
 | --- | --- |
 | 换成别的人物图片 | 替换 `assets/doubao-character.png`（透明背景 PNG） |
 | 人物大小、位置 | `src/client/hero.js` 顶部的 `CONFIG` |
-| 点颜色 | `src/client/hero.js` 的 `appearanceFor()` |
+| 点的颜色、浓淡 | `src/client/hero.js` 的 `appearanceFor()` |
 | 点的疏密、鼠标力度 | `src/client/digitile.js` 顶部的常量 |
 
 改完重新打包一次：

@@ -209,6 +209,8 @@ window.__ModuleLoader__.load({
       uniform vec3 uColor;
       /** Centre bloom weight; 0 flattens the field to one tone. */
       uniform float uGlow;
+      /** Overall particle opacity, so a theme can hold the field back. */
+      uniform float uOpacity;
       out vec4 outColor;
 
       void main() {
@@ -216,7 +218,7 @@ window.__ModuleLoader__.load({
         float glow = smoothstep(8.0, 0.0, dist) * uGlow * vAssembly;
 
         float baseAlpha = mix(0.45, 0.75, vAssembly);
-        float alpha = vOpacity * (baseAlpha + glow);
+        float alpha = vOpacity * (baseAlpha + glow) * uOpacity;
         float shimmer = sin(uTime * 1.5 + vWorldPos.x * 5.0 + vWorldPos.y * 3.0) * 0.1 + 0.9;
         alpha *= shimmer * min(vLight, 1.0);
 
@@ -472,6 +474,7 @@ window.__ModuleLoader__.load({
           shadeMin: options.shadeMin === void 0 ? LIGHT.shadeMin : options.shadeMin,
           shadeMax: options.shadeMax === void 0 ? LIGHT.shadeMax : options.shadeMax,
           glow: options.glow === void 0 ? 0.3 : options.glow,
+          opacity: options.opacity === void 0 ? 1 : options.opacity,
           followPointer: options.followPointer !== false,
         }
         const gl = canvas.getContext('webgl2', {
@@ -532,6 +535,7 @@ window.__ModuleLoader__.load({
         const uShadeMin = uniform('uShadeMin')
         const uShadeMax = uniform('uShadeMax')
         const uGlow = uniform('uGlow')
+        const uOpacity = uniform('uOpacity')
         const uColor = uniform('uColor')
 
         const geometry = tileGeometry()
@@ -571,7 +575,6 @@ window.__ModuleLoader__.load({
         let lastTime = 0
         let frame = 0
         let disposed = false
-        let currentGlow = 0
         let mouseStrength = 0
         let pointerHasMoved = false
         let pointerActive = false
@@ -652,7 +655,12 @@ window.__ModuleLoader__.load({
           multiply(viewProj, proj, view)
 
           gl.enable(gl.BLEND)
-          if (appearance.additive) gl.blendFunc(gl.ONE, gl.ONE)
+          // Additive uses SRC_ALPHA/ONE rather than ONE/ONE: plain ONE/ONE ignores the
+          // fragment's alpha, so `uOpacity` would dim the alpha-blended light surface
+          // but leave the additive dark surface at full strength. Scaling the source by
+          // its alpha keeps the glow behaviour while making opacity mean something on
+          // both surfaces.
+          if (appearance.additive) gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
           else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
           gl.disable(gl.DEPTH_TEST)
           gl.depthMask(false)
@@ -703,6 +711,7 @@ window.__ModuleLoader__.load({
           gl.uniform1f(uShadeMin, appearance.shadeMin)
           gl.uniform1f(uShadeMax, appearance.shadeMax)
           gl.uniform1f(uGlow, appearance.glow)
+          gl.uniform1f(uOpacity, appearance.opacity)
           gl.uniform3f(
             uColor,
             appearance.color[0] * intensity,
@@ -762,6 +771,7 @@ window.__ModuleLoader__.load({
             if (next.shadeMin !== undefined) appearance.shadeMin = next.shadeMin
             if (next.shadeMax !== undefined) appearance.shadeMax = next.shadeMax
             if (next.glow !== undefined) appearance.glow = next.glow
+            if (next.opacity !== undefined) appearance.opacity = next.opacity
           },
           /** Report the pointer state so an idle field can be restarted after a resize. */
           refresh() {
@@ -862,25 +872,22 @@ window.__ModuleLoader__.load({
         mask-image: linear-gradient(to bottom, #000 calc(100% - var(--doubao-field-fade, 104px)), transparent 100%);
       }
 
-      /* Centring uses auto margins rather than translateX(-50%): a transform would park
-         the artwork on half-pixel boundaries and soften every edge on 1x screens. */
+      /* The canvas is wider than this box on purpose, and a box that overflows its
+         container is NOT centred by auto margins (they resolve to 0 and it sits flush
+         left — the field then drifts off-centre and gets clipped). So both layers are
+         centred by a computed, whole-pixel negative margin-left set from the layout
+         pass, which also keeps them off half-pixel boundaries. */
       [data-doubao-canvas] {
         position: absolute;
-        left: 0;
-        right: 0;
-        margin-left: auto;
-        margin-right: auto;
+        left: 50%;
         display: block;
         pointer-events: none;
       }
 
       [data-doubao-character] {
         position: absolute;
-        left: 0;
-        right: 0;
+        left: 50%;
         bottom: 0;
-        margin-left: auto;
-        margin-right: auto;
         display: block;
         width: var(--doubao-character-w, 300px);
         height: auto;
@@ -1088,23 +1095,24 @@ window.__ModuleLoader__.load({
       }
 
       /**
-       * Appearance per surface, one flat colour for every particle.
+       * Appearance per surface, one flat colour for every particle, held back so the
+       * field reads as a backdrop rather than as content.
        *
        * The upstream material multiplies a single light into the colour, adds a centre
        * bloom, and uses additive blending as a glow on black. On a white surface that
        * mixture reads as a blue-and-grey speckle, and used additively there it would be
        * invisible. So `shadeMin === shadeMax` flattens the per-particle shading and
-       * `glow: 0` drops the centre tint, leaving one tone per surface: a light periwinkle
-       * on light, white on dark. Restoring the upstream treatment is a one-line change —
-       * give the two bounds the upstream 0.28 / 2.79 (dark) or 0.55 / 1.35 (light) and
-       * `glow: 0.3`.
+       * `glow: 0` drops the centre tint, leaving one tone per surface; `opacity` then
+       * scales the whole field down. Raising `opacity` towards 1, or restoring the
+       * upstream shading with 0.28 / 2.79 (dark) and 0.55 / 1.35 (light) plus
+       * `glow: 0.3`, brings the original look back.
        * @param isDark - whether the resolved surface is dark.
-       * @returns colour, blending, shading range and bloom weight for the field.
+       * @returns colour, blending, shading range, bloom weight and opacity for the field.
        */
       function appearanceFor(isDark) {
         return isDark
-          ? { additive: true, color: [0.78, 0.83, 0.92], shadeMin: 1, shadeMax: 1, glow: 0 }
-          : { additive: false, color: [0.55, 0.64, 0.9], shadeMin: 1, shadeMax: 1, glow: 0 }
+          ? { additive: true, color: [0.78, 0.83, 0.92], shadeMin: 1, shadeMax: 1, glow: 0, opacity: 0.5 }
+          : { additive: false, color: [0.55, 0.64, 0.9], shadeMin: 1, shadeMax: 1, glow: 0, opacity: 0.5 }
       }
 
       /* ------------------------------------------------------------------ *
@@ -1172,7 +1180,8 @@ window.__ModuleLoader__.load({
             // and render on whole CSS pixels so the browser can map the source texels
             // 1:1-ish at every window size and zoom level instead of resampling a
             // fractional box. The height is derived from the rounded width so the
-            // artwork keeps its aspect.
+            // artwork keeps its aspect, and an even width keeps the centring offset a
+            // whole pixel.
             const dpr = window.devicePixelRatio || 1
             let width = Math.min(
               availH * CONFIG.characterBandRatio * CHARACTER_ASPECT,
@@ -1183,9 +1192,11 @@ window.__ModuleLoader__.load({
               (availW - CONFIG.fieldGap) / CONFIG.whaleWidthRatio,
             )
             width = Math.max(72, Math.floor(width))
+            if (width % 2 !== 0) width -= 1
             const height = Math.round(width / CHARACTER_ASPECT)
             image.style.width = `${width}px`
             image.style.height = `${height}px`
+            image.style.marginLeft = `${-width / 2}px`
             image.style.setProperty('--doubao-character-fade', `${Math.round(height * CONFIG.characterFadeRatio)}px`)
 
             // ── dot-matrix field ───────────────────────────────────────────
@@ -1195,15 +1206,17 @@ window.__ModuleLoader__.load({
             // geometry, never the leftover height.
             const unit = (width * CONFIG.whaleWidthRatio) / WHALE_UNITS.width
             const whaleHeight = WHALE_UNITS.height * unit
-            const canvasHeight = FIELD_VIEW_HEIGHT * unit
-            const canvasWidth = Math.round(canvasHeight)
+            const canvasHeight = Math.round(FIELD_VIEW_HEIGHT * unit)
+            const canvasWidth = canvasHeight % 2 === 0 ? canvasHeight : canvasHeight + 1
             // The whale is centred inside its canvas, so putting the whale's bottom on
             // the controls row pushes the canvas' bottom below the clip box on purpose:
             // the fade in `styles.js` dissolves that overhang, and the clip box keeps it
-            // from growing a scrollbar.
+            // from growing a scrollbar. The canvas is far wider than the clip box, so it
+            // is centred with an explicit offset — see the note in `styles.js`.
             const canvasBottom = -(canvasHeight - whaleHeight) / 2
             canvas.style.width = `${canvasWidth}px`
-            canvas.style.height = `${Math.round(canvasHeight)}px`
+            canvas.style.height = `${canvasHeight}px`
+            canvas.style.marginLeft = `${-canvasWidth / 2}px`
             canvas.style.bottom = `${Math.round(canvasBottom)}px`
             // The clip box is exactly the band, so nothing the field draws can create
             // scrollable overflow, vertically or horizontally.

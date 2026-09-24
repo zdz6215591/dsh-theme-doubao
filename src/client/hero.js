@@ -158,23 +158,24 @@ function readSurfaceIsDark(probe) {
 }
 
 /**
- * Appearance per surface, one flat colour for every particle.
+ * Appearance per surface, one flat colour for every particle, held back so the
+ * field reads as a backdrop rather than as content.
  *
  * The upstream material multiplies a single light into the colour, adds a centre
  * bloom, and uses additive blending as a glow on black. On a white surface that
  * mixture reads as a blue-and-grey speckle, and used additively there it would be
  * invisible. So `shadeMin === shadeMax` flattens the per-particle shading and
- * `glow: 0` drops the centre tint, leaving one tone per surface: a light periwinkle
- * on light, white on dark. Restoring the upstream treatment is a one-line change —
- * give the two bounds the upstream 0.28 / 2.79 (dark) or 0.55 / 1.35 (light) and
- * `glow: 0.3`.
+ * `glow: 0` drops the centre tint, leaving one tone per surface; `opacity` then
+ * scales the whole field down. Raising `opacity` towards 1, or restoring the
+ * upstream shading with 0.28 / 2.79 (dark) and 0.55 / 1.35 (light) plus
+ * `glow: 0.3`, brings the original look back.
  * @param isDark - whether the resolved surface is dark.
- * @returns colour, blending, shading range and bloom weight for the field.
+ * @returns colour, blending, shading range, bloom weight and opacity for the field.
  */
 function appearanceFor(isDark) {
   return isDark
-    ? { additive: true, color: [0.78, 0.83, 0.92], shadeMin: 1, shadeMax: 1, glow: 0 }
-    : { additive: false, color: [0.55, 0.64, 0.9], shadeMin: 1, shadeMax: 1, glow: 0 }
+    ? { additive: true, color: [0.78, 0.83, 0.92], shadeMin: 1, shadeMax: 1, glow: 0, opacity: 0.5 }
+    : { additive: false, color: [0.55, 0.64, 0.9], shadeMin: 1, shadeMax: 1, glow: 0, opacity: 0.5 }
 }
 
 /* ------------------------------------------------------------------ *
@@ -242,7 +243,8 @@ function DoubaoHeroMark() {
       // and render on whole CSS pixels so the browser can map the source texels
       // 1:1-ish at every window size and zoom level instead of resampling a
       // fractional box. The height is derived from the rounded width so the
-      // artwork keeps its aspect.
+      // artwork keeps its aspect, and an even width keeps the centring offset a
+      // whole pixel.
       const dpr = window.devicePixelRatio || 1
       let width = Math.min(
         availH * CONFIG.characterBandRatio * CHARACTER_ASPECT,
@@ -253,9 +255,11 @@ function DoubaoHeroMark() {
         (availW - CONFIG.fieldGap) / CONFIG.whaleWidthRatio,
       )
       width = Math.max(72, Math.floor(width))
+      if (width % 2 !== 0) width -= 1
       const height = Math.round(width / CHARACTER_ASPECT)
       image.style.width = `${width}px`
       image.style.height = `${height}px`
+      image.style.marginLeft = `${-width / 2}px`
       image.style.setProperty('--doubao-character-fade', `${Math.round(height * CONFIG.characterFadeRatio)}px`)
 
       // ── dot-matrix field ───────────────────────────────────────────
@@ -265,15 +269,17 @@ function DoubaoHeroMark() {
       // geometry, never the leftover height.
       const unit = (width * CONFIG.whaleWidthRatio) / WHALE_UNITS.width
       const whaleHeight = WHALE_UNITS.height * unit
-      const canvasHeight = FIELD_VIEW_HEIGHT * unit
-      const canvasWidth = Math.round(canvasHeight)
+      const canvasHeight = Math.round(FIELD_VIEW_HEIGHT * unit)
+      const canvasWidth = canvasHeight % 2 === 0 ? canvasHeight : canvasHeight + 1
       // The whale is centred inside its canvas, so putting the whale's bottom on
       // the controls row pushes the canvas' bottom below the clip box on purpose:
       // the fade in `styles.js` dissolves that overhang, and the clip box keeps it
-      // from growing a scrollbar.
+      // from growing a scrollbar. The canvas is far wider than the clip box, so it
+      // is centred with an explicit offset — see the note in `styles.js`.
       const canvasBottom = -(canvasHeight - whaleHeight) / 2
       canvas.style.width = `${canvasWidth}px`
-      canvas.style.height = `${Math.round(canvasHeight)}px`
+      canvas.style.height = `${canvasHeight}px`
+      canvas.style.marginLeft = `${-canvasWidth / 2}px`
       canvas.style.bottom = `${Math.round(canvasBottom)}px`
       // The clip box is exactly the band, so nothing the field draws can create
       // scrollable overflow, vertically or horizontally.
